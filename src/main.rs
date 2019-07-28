@@ -39,7 +39,7 @@ fn fibonnaci(payload: web::Json<MyObj>) -> HttpResponse {
 }
 
 /// simple index handler
-#[get("/welcome")]
+#[get("/")]
 fn welcome(session: Session, req: HttpRequest) -> Result<HttpResponse> {
     println!("{:?}", req);
 
@@ -56,7 +56,7 @@ fn welcome(session: Session, req: HttpRequest) -> Result<HttpResponse> {
     // response
     Ok(HttpResponse::build(StatusCode::OK)
         .content_type("text/html; charset=utf-8")
-        .body(include_str!("../static/welcome.html")))
+        .body(include_str!("../client/public/index.html")))
 }
 
 /// 404 handler
@@ -136,12 +136,12 @@ fn main() -> io::Result<()> {
             // static files
             .service(fs::Files::new("/static", "static").show_files_listing())
             // redirect
-            .service(web::resource("/").route(web::get().to(|req: HttpRequest| {
-                println!("{:?}", req);
-                HttpResponse::Found()
-                    .header(header::LOCATION, "static/welcome.html")
-                    .finish()
-            })))
+            // .service(web::resource("/").route(web::get().to(|req: HttpRequest| {
+            //     println!("{:?}", req);
+            //     HttpResponse::Found()
+            //         .header(header::LOCATION, "")
+            //         .finish()
+            // })))
             // default
             .default_service(
                 // 404 for GET request
