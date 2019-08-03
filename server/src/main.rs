@@ -4,13 +4,15 @@ extern crate actix_web;
 use std::{env, io};
 
 use actix_files as fs;
-use actix_session::{CookieSession, Session};
-use actix_web::http::{header, Method, StatusCode};
+use actix_session::{CookieSession};
+use actix_web::http::{Method, StatusCode};
 use actix_web::{
-    error, guard, middleware, web, App, Error, HttpRequest, HttpResponse, HttpServer,
+    http, error, guard, middleware, web, App, Error, HttpRequest, HttpResponse, HttpServer,
     Result,
 };
+use actix_cors::Cors;
 
+use listenfd::ListenFd;
 use bytes::Bytes;
 
 use futures::unsync::mpsc;
@@ -34,30 +36,10 @@ struct MyObj {
 fn fibonnaci(payload: web::Json<MyObj>) -> HttpResponse {
     println!("{:?}", payload);
 
-    let resp = json!({"status": "ok"});
+    let resp = json!({"status": "oki"});
     HttpResponse::Ok().json(resp)   
 }
 
-/// simple index handler
-#[get("/")]
-fn welcome(session: Session, req: HttpRequest) -> Result<HttpResponse> {
-    println!("{:?}", req);
-
-    // session
-    let mut counter = 1;
-    if let Some(count) = session.get::<i32>("counter")? {
-        println!("SESSION value: {}", count);
-        counter = count + 1;
-    }
-
-    // set counter to session
-    session.set("counter", counter)?;
-
-    // response
-    Ok(HttpResponse::build(StatusCode::OK)
-        .content_type("text/html; charset=utf-8")
-        .body(include_str!("../client/public/index.html")))
-}
 
 /// 404 handler
 fn p404() -> Result<fs::NamedFile> {
@@ -93,12 +75,13 @@ fn with_param(req: HttpRequest, path: web::Path<(String,)>) -> HttpResponse {
         .body(format!("Hello {}!", path.0))
 }
 
-fn main() -> io::Result<()> {
+fn main(){
     env::set_var("RUST_LOG", "actix_web=debug");
     env_logger::init();
-    let sys = actix_rt::System::new("basic-example");
 
-    HttpServer::new(|| {
+    let mut listenfd = ListenFd::from_env();
+
+    let mut server = HttpServer::new(|| {
         App::new()
             // cookie session middleware
             .wrap(CookieSession::signed(&[0; 32]).secure(false))
@@ -107,7 +90,6 @@ fn main() -> io::Result<()> {
             // register favicon
             .service(favicon)
             // register simple route, handle all methods
-            .service(welcome)
             .service(web::resource("/fibonnaci").route(web::post().to(fibonnaci)))
             // with path parameters
             .service(web::resource("/user/{name}").route(web::get().to(with_param)))
@@ -135,13 +117,6 @@ fn main() -> io::Result<()> {
             }))
             // static files
             .service(fs::Files::new("/static", "static").show_files_listing())
-            // redirect
-            // .service(web::resource("/").route(web::get().to(|req: HttpRequest| {
-            //     println!("{:?}", req);
-            //     HttpResponse::Found()
-            //         .header(header::LOCATION, "")
-            //         .finish()
-            // })))
             // default
             .default_service(
                 // 404 for GET request
@@ -154,10 +129,22 @@ fn main() -> io::Result<()> {
                             .to(|| HttpResponse::MethodNotAllowed()),
                     ),
             )
-    })
-    .bind("127.0.0.1:8080")?
-    .start();
+            .wrap(
+                Cors::new() // <- Construct CORS middleware builder
+                .allowed_origin("http://localhost:3000")
+                .allowed_methods(vec!["GET", "POST"])
+                .allowed_headers(vec![http::header::AUTHORIZATION, http::header::ACCEPT])
+                .allowed_header(http::header::CONTENT_TYPE)
+                .max_age(3600)
+            )
+    });
 
-    println!("Starting http server: http://127.0.0.1:8080");
-    sys.run()
+    server = if let Some(l) = listenfd.take_tcp_listener(0).unwrap() {
+        server.listen(l).unwrap()
+    } else {
+        server.bind("0.0.0.0:5000").unwrap()
+    };
+
+    println!("Starting http server: http://0.0.0.0:5000");
+    server.run().unwrap();
 }

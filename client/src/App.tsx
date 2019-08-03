@@ -10,7 +10,7 @@ const App: React.FC = () => {
       name: "Test",
       number: 3
     }
-    fetch("/fibonnaci", {method: "POST", body: JSON.stringify(payload), headers: {"Content-Type": "application/json"}}).then(function (resp) {
+    fetch("http://localhost:5000/fibonnaci", {method: "POST", body: JSON.stringify(payload), headers: {"Content-Type": "application/json"}}).then(function (resp) {
       resp.json().then(function (val) {
         console.log(val);
       })

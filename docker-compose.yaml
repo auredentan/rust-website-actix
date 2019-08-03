@@ -2,13 +2,31 @@ version: "3"
 
 services:
 
+  nginx:
+    build:
+      context: nginx
+    links:
+      - server
+      - client
+    ports:
+      - 3000:3000
+      - 5000:5000
+
   server:
     build:
-      context: 
+      context:  server
+      dockerfile: dev.dockerfile
+    volumes:
+      - ./server:/app/
+
 
   client:
     build:
       context: client
-      dockerfile: Dockerfile
+      dockerfile: dev.dockerfile
     volumes:
-      client:app/client
+      - ./client/public:/app/public
+      - ./client/src:/app/src
+      - ./client/tsconfig.json:/app/tsconfig.json
+    depends_on: 
+      - server
